@@ -1,0 +1,58 @@
+import numpy as np
+import os, cv2
+from PIL import Image
+from tensorflow.keras.applications.resnet50 import ResNet50, preprocess_input as prep_res, decode_predictions
+from tensorflow.keras.applications.efficientnet import EfficientNetB0, preprocess_input as prep_eff
+
+SIZE = (224, 224)
+
+# Load models
+resnet = ResNet50(weights="imagenet")
+effnet = EfficientNetB0(weights="imagenet")
+
+# TTA crops
+def tta(img):
+    w, h = img.size
+    tw, th = SIZE
+    if w < tw or h < th:
+        img = img.resize((max(w, tw), max(h, th)))
+        w, h = img.size
+
+    crops = [
+        img.crop(((w-tw)//2, (h-th)//2, (w+tw)//2, (h+th)//2)),  # center
+        img.crop((0, 0, tw, th)),                               # top-left
+        img.crop((w-tw, 0, w, th)),                             # top-right
+        img.crop((0, h-th, tw, h)),                             # bottom-left
+        img.crop((w-tw, h-th, w, h))                            # bottom-right
+    ]
+    crops += [c.transpose(Image.FLIP_LEFT_RIGHT) for c in crops]
+    return crops
+
+# Predict
+def predict(img_path, topk=5):
+    img = Image.open(img_path).convert("RGB")
+    crops = tta(img)
+
+    p1, p2 = [], []
+    for c in crops:
+        a = cv2.resize(np.array(c), SIZE).astype("float32")
+        p1.append(resnet.predict(prep_res(a)[None], verbose=0)[0])
+        p2.append(effnet.predict(prep_eff(a)[None], verbose=0)[0])
+
+    avg = (np.mean(p1, 0) + np.mean(p2, 0)) / 2
+    idx = avg.argsort()[-topk:][::-1]
+
+    print("\nTop predictions (ensemble + TTA):")
+    for i in idx:
+        d = np.zeros((1, 1000))
+        d[0, i] = 1
+        name = decode_predictions(d, 1)[0][0][1]
+        print(f"{name}: {avg[i]:.4f}")
+
+# Main
+if __name__ == "__main__":
+    path = input("Enter image path: ").strip()
+    if os.path.exists(path):
+        predict(path)
+    else:
+        print("Image not found!")
