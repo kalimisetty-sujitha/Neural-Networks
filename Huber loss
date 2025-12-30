@@ -1,0 +1,45 @@
+import numpy as np
+
+# Re-using the network setup from cell ibTSpo4BfsjT
+x = np.array([1.0, 2.0])
+W1 = np.array([[0.2, -0.1],
+               [0.4,  0.3]])
+b1 = np.array([0.1, -0.2])
+W2 = np.array([[0.5],
+               [-0.4]])
+b2 = np.array([0.2])
+
+def relu(z):
+    return np.maximum(0, z)
+
+def sigmoid(z):
+    return 1 / (1 + np.exp(-z))
+
+# Forward pass to get network prediction (y_hat)
+z1 = np.dot(x, W1) + b1
+a1 = relu(z1)
+z2 = np.dot(a1, W2) + b2
+y_hat = sigmoid(z2) # Using sigmoid as in the original FFNN setup
+
+def huber_loss(y_true, y_pred, delta=1.0):
+    error = y_true - y_pred
+    abs_error = np.abs(error)
+    quadratic_part = 0.5 * error**2
+    linear_part = delta * (abs_error - 0.5 * delta)
+    return np.where(abs_error <= delta, quadratic_part, linear_part)
+
+# Example: Calculate Huber Loss
+y_true_regression = 0.75 # A continuous true value for regression
+
+# y_hat is already a scalar (or a 1-element array, take the first element)
+calculated_huber_loss = huber_loss(y_true_regression, y_hat[0])
+
+print(f"Network prediction (y_hat): {y_hat[0]:.4f}")
+print(f"Assumed true value (y_true): {y_true_regression}")
+print(f"Calculated Huber Loss (delta=1.0): {calculated_huber_loss:.4f}")
+
+# Example with a larger error to show the linear part
+y_true_large_error = 0.1
+calculated_huber_loss_large = huber_loss(y_true_large_error, y_hat[0])
+print(f"\nAssumed true value (y_true) with large error: {y_true_large_error}")
+print(f"Calculated Huber Loss (large error): {calculated_huber_loss_large:.4f}")
